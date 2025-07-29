@@ -3,7 +3,7 @@ from firebase_admin import credentials, initialize_app
 import os
 
 # Path to your service account key JSON file
-SERVICE_ACCOUNT_KEY_PATH = os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY', 'serviceAccountKey.json')
+SERVICE_ACCOUNT_KEY_PATH = os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY', '../serviceAccountKey.json')
 
 firebase_app = None
 
