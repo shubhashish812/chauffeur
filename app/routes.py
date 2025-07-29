@@ -16,7 +16,7 @@ def test_firebase():
         import firebase_admin
         from firebase_admin import firestore
         # Get Firestore client
-        db = firestore.client(database='chauffeur')
+        db = firestore.client(database_id='chauffeur')
         # Attempt to list collections (should work if connected)
         collections = [col.id for col in db.collections()]
         return {"success": True, "collections": collections}
