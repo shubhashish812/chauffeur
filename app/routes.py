@@ -3,7 +3,10 @@ from fastapi import APIRouter
 router = APIRouter()
 
 from .test import test_router
+from .auth import auth_router
+
 router.include_router(test_router)
+router.include_router(auth_router)
 
 @router.get("/hello")
 def say_hello():
