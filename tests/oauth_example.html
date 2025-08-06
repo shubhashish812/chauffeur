@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chauffeur - Google OAuth Example</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .auth-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .google-btn {
+            margin: 10px 0;
+        }
+        .user-info {
+            background: #e8f5e8;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #ffe8e8;
+            color: #d32f2f;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #3367d6;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚗 Chauffeur - Authentication Demo</h1>
+        
+        <div class="auth-section">
+            <h2>🔐 Traditional Email/Password Authentication</h2>
+            <div>
+                <input type="email" id="email" placeholder="Email" />
+                <input type="password" id="password" placeholder="Password" />
+                <button onclick="signUp()">Sign Up</button>
+                <button onclick="signIn()">Sign In</button>
+            </div>
+        </div>
+
+        <div class="auth-section">
+            <h2>🌐 Google OAuth Authentication</h2>
+            <p>Click the button below to sign in with Google:</p>
+            <div id="g_id_onload"
+                 data-client_id="321572526684-3gbub0h93u727bjeq7mb78lt2autpohk.apps.googleusercontent.com"
+                 data-callback="handleCredentialResponse"
+                 data-auto_prompt="false">
+            </div>
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-size="large"
+                 data-theme="outline"
+                 data-text="sign_in_with"
+                 data-shape="rectangular"
+                 data-logo_alignment="left">
+            </div>
+        </div>
+
+        <div id="userInfo" style="display: none;">
+            <h3>👤 User Information</h3>
+            <div class="user-info">
+                <p><strong>UID:</strong> <span id="userUid"></span></p>
+                <p><strong>Email:</strong> <span id="userEmail"></span></p>
+                <p><strong>Display Name:</strong> <span id="userDisplayName"></span></p>
+                <p><strong>Email Verified:</strong> <span id="userEmailVerified"></span></p>
+                <p><strong>Provider:</strong> <span id="userProvider"></span></p>
+                <button onclick="signOut()">Sign Out</button>
+            </div>
+        </div>
+
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        
+        // Message display function
+        function showMessage(message, type = 'info') {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            messagesDiv.appendChild(messageDiv);
+            
+            // Remove message after 5 seconds
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
+
+        // Traditional email/password signup
+        async function signUp() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showMessage('Please enter both email and password', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/signup`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password,
+                        display_name: email.split('@')[0] // Use email prefix as display name
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('Sign up successful!', 'success');
+                    displayUserInfo(data.user, data.token);
+                } else {
+                    showMessage(`Sign up failed: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Traditional email/password signin
+        async function signIn() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showMessage('Please enter both email and password', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/signin`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('Sign in successful!', 'success');
+                    displayUserInfo(data.user, data.token);
+                } else {
+                    showMessage(`Sign in failed: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Google OAuth callback
+        async function handleCredentialResponse(response) {
+            try {
+                const result = await fetch(`${API_BASE}/oauth/google/signin`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        id_token: response.credential
+                    })
+                });
+                
+                const data = await result.json();
+                
+                if (result.ok) {
+                    showMessage('Google sign-in successful!', 'success');
+                    displayUserInfo(data.user, data.token);
+                } else {
+                    showMessage(`Google sign-in failed: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Error during Google sign-in: ${error.message}`, 'error');
+            }
+        }
+
+        // Display user information
+        function displayUserInfo(user, token) {
+            document.getElementById('userUid').textContent = user.uid;
+            document.getElementById('userEmail').textContent = user.email;
+            document.getElementById('userDisplayName').textContent = user.display_name || 'N/A';
+            document.getElementById('userEmailVerified').textContent = user.email_verified ? 'Yes' : 'No';
+            document.getElementById('userProvider').textContent = user.provider || 'email/password';
+            
+            document.getElementById('userInfo').style.display = 'block';
+            
+            // Store token and user info in localStorage
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', JSON.stringify(user));
+        }
+
+        // Sign out
+        function signOut() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            
+            if (user.uid) {
+                // Revoke tokens on server
+                fetch(`${API_BASE}/auth/signout/${user.uid}`, {
+                    method: 'POST'
+                }).catch(error => {
+                    console.error('Error signing out:', error);
+                });
+            }
+            
+            // Clear local storage
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            
+            // Hide user info
+            document.getElementById('userInfo').style.display = 'none';
+            
+            // Clear form fields
+            document.getElementById('email').value = '';
+            document.getElementById('password').value = '';
+            
+            showMessage('Signed out successfully', 'success');
+        }
+
+        // Check if user is already signed in on page load
+        window.onload = function() {
+            const user = localStorage.getItem('user');
+            const token = localStorage.getItem('token');
+            
+            if (user && token) {
+                displayUserInfo(JSON.parse(user), token);
+            }
+        };
+    </script>
+</body>
+</html>
