@@ -2,9 +2,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from firebase_admin import auth
 from typing import Optional, Dict, Any
-import requests
-import os
-import json
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 from google.auth.exceptions import GoogleAuthError

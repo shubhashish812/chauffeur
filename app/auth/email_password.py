@@ -1,16 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
 from pydantic import BaseModel, EmailStr
 from firebase_admin import auth
 from typing import Optional, Dict, Any
 import requests
-import os
 from .base import BaseAuthProvider, BaseAuthRequest, BaseAuthResponse
 
 class EmailPasswordAuthProvider(BaseAuthProvider):
-    """Email/Password authentication provider"""
+    """Email/Password authentication provider with email verification"""
     
     def setup_routes(self):
-        """Setup email/password authentication routes"""
+        """Setup email/password authentication routes with email verification"""
         
         # Pydantic models for email/password auth
         class SignUpRequest(BaseAuthRequest):
@@ -31,9 +30,13 @@ class EmailPasswordAuthProvider(BaseAuthProvider):
         class AuthResponse(BaseAuthResponse):
             user: UserResponse
 
+        class VerificationResponse(BaseModel):
+            message: str
+            email_verified: bool
+
         @self.router.post("/signup", response_model=AuthResponse)
         async def signup(request: SignUpRequest):
-            """Create a new user account with email and password"""
+            """Create a new user account with email and password, and send verification email"""
             try:
                 # Create user in Firebase Auth
                 user_properties = {
@@ -46,6 +49,13 @@ class EmailPasswordAuthProvider(BaseAuthProvider):
                     user_properties['display_name'] = request.display_name
                     
                 user_record = auth.create_user(**user_properties)
+                
+                # Send email verification automatically
+                try:
+                    auth.send_email_verification(user_record.uid)
+                except Exception as e:
+                    # Log the error but don't fail the signup
+                    print(f"Failed to send verification email: {e}")
                 
                 # Create custom token for the user
                 custom_token = auth.create_custom_token(user_record.uid)
@@ -115,6 +125,83 @@ class EmailPasswordAuthProvider(BaseAuthProvider):
                 raise
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Error signing in: {str(e)}")
+
+        @self.router.post("/send-verification-email/{uid}", response_model=VerificationResponse)
+        async def send_verification_email(uid: str):
+            """Send email verification to a user"""
+            try:
+                # Check if user exists
+                user_record = auth.get_user(uid)
+                
+                # Send verification email
+                auth.send_email_verification(uid)
+                
+                return VerificationResponse(
+                    message="Verification email sent successfully",
+                    email_verified=user_record.email_verified
+                )
+                
+            except auth.UserNotFoundError:
+                raise HTTPException(status_code=404, detail="User not found")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error sending verification email: {str(e)}")
+
+        @self.router.post("/resend-verification-email", response_model=VerificationResponse)
+        async def resend_verification_email(email: str):
+            """Resend verification email by email address"""
+            try:
+                # Get user by email
+                user_record = auth.get_user_by_email(email)
+                
+                # Send verification email
+                auth.send_email_verification(user_record.uid)
+                
+                return VerificationResponse(
+                    message="Verification email resent successfully",
+                    email_verified=user_record.email_verified
+                )
+                
+            except auth.UserNotFoundError:
+                raise HTTPException(status_code=404, detail="User not found")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error resending verification email: {str(e)}")
+
+        @self.router.get("/check-verification/{uid}", response_model=VerificationResponse)
+        async def check_verification_status(uid: str):
+            """Check if a user's email is verified"""
+            try:
+                user_record = auth.get_user(uid)
+                
+                return VerificationResponse(
+                    message="Verification status checked successfully",
+                    email_verified=user_record.email_verified
+                )
+                
+            except auth.UserNotFoundError:
+                raise HTTPException(status_code=404, detail="User not found")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error checking verification status: {str(e)}")
+
+        @self.router.post("/require-verification/{uid}")
+        async def require_verification(uid: str):
+            """Check if user's email is verified and return error if not"""
+            try:
+                user_record = auth.get_user(uid)
+                
+                if not user_record.email_verified:
+                    raise HTTPException(
+                        status_code=403, 
+                        detail="Email verification required. Please check your email and click the verification link."
+                    )
+                
+                return {"message": "Email is verified", "email_verified": True}
+                
+            except auth.UserNotFoundError:
+                raise HTTPException(status_code=404, detail="User not found")
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error checking verification: {str(e)}")
 
         @self.router.post("/signout/{uid}")
         async def signout(uid: str):

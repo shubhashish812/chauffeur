@@ -3,11 +3,10 @@ from fastapi import APIRouter
 router = APIRouter()
 
 from .test import test_router
-from .auth_router import auth_router, oauth_router
+from .auth import auth_router  # Import unified auth router
 
 router.include_router(test_router)
-router.include_router(auth_router)
-router.include_router(oauth_router)
+router.include_router(auth_router)  # Include unified auth router
 
 @router.get("/hello")
 def say_hello():
