@@ -1,17 +1,20 @@
-from fastapi import HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
 from firebase_admin import auth
 from typing import Optional, Dict, Any
 import requests
+import os
 from .base import BaseAuthProvider, BaseAuthRequest, BaseAuthResponse
 
 class EmailPasswordAuthProvider(BaseAuthProvider):
     """Email/Password authentication provider with email verification"""
     
+    def __init__(self):
+        self.router = APIRouter(tags=["email-password"])
+        super().__init__(self.router)
+    
     def setup_routes(self):
         """Setup email/password authentication routes with email verification"""
-        
-        # Pydantic models for email/password auth
         class SignUpRequest(BaseAuthRequest):
             email: EmailStr
             password: str
@@ -52,7 +55,35 @@ class EmailPasswordAuthProvider(BaseAuthProvider):
                 
                 # Send email verification automatically
                 try:
-                    auth.send_email_verification(user_record.uid)
+                    # Use Firebase Auth REST API to send verification email
+                    api_key = self.get_environment_variable('FIREBASE_API_KEY', 'Firebase API key')
+                    
+                    # Get the user's ID token first
+                    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
+                    payload = {
+                        "email": request.email,
+                        "password": request.password,
+                        "returnSecureToken": True
+                    }
+                    
+                    response = requests.post(url, json=payload)
+                    if response.status_code == 200:
+                        data = response.json()
+                        id_token = data['idToken']
+                        
+                        # Send verification email using REST API
+                        verify_url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={api_key}"
+                        verify_payload = {
+                            "requestType": "VERIFY_EMAIL",
+                            "idToken": id_token
+                        }
+                        
+                        verify_response = requests.post(verify_url, json=verify_payload)
+                        if verify_response.status_code != 200:
+                            print(f"Failed to send verification email: {verify_response.text}")
+                    else:
+                        print(f"Failed to get ID token for verification email: {response.text}")
+                        
                 except Exception as e:
                     # Log the error but don't fail the signup
                     print(f"Failed to send verification email: {e}")
@@ -133,13 +164,43 @@ class EmailPasswordAuthProvider(BaseAuthProvider):
                 # Check if user exists
                 user_record = auth.get_user(uid)
                 
-                # Send verification email
-                auth.send_email_verification(uid)
+                # Use Firebase Auth REST API to send verification email
+                api_key = self.get_environment_variable('FIREBASE_API_KEY', 'Firebase API key')
                 
-                return VerificationResponse(
-                    message="Verification email sent successfully",
-                    email_verified=user_record.email_verified
-                )
+                # We need to get an ID token for the user to send verification email
+                # This is a limitation - we need the user's password or a custom token
+                # For now, we'll create a custom token and exchange it for an ID token
+                custom_token = auth.create_custom_token(uid)
+                
+                # Exchange custom token for ID token
+                exchange_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key={api_key}"
+                exchange_payload = {
+                    "token": custom_token.decode('utf-8'),
+                    "returnSecureToken": True
+                }
+                
+                exchange_response = requests.post(exchange_url, json=exchange_payload)
+                if exchange_response.status_code == 200:
+                    exchange_data = exchange_response.json()
+                    id_token = exchange_data['idToken']
+                    
+                    # Send verification email using REST API
+                    verify_url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={api_key}"
+                    verify_payload = {
+                        "requestType": "VERIFY_EMAIL",
+                        "idToken": id_token
+                    }
+                    
+                    verify_response = requests.post(verify_url, json=verify_payload)
+                    if verify_response.status_code == 200:
+                        return VerificationResponse(
+                            message="Verification email sent successfully",
+                            email_verified=user_record.email_verified
+                        )
+                    else:
+                        raise HTTPException(status_code=500, detail=f"Failed to send verification email: {verify_response.text}")
+                else:
+                    raise HTTPException(status_code=500, detail=f"Failed to get ID token: {exchange_response.text}")
                 
             except auth.UserNotFoundError:
                 raise HTTPException(status_code=404, detail="User not found")
@@ -153,13 +214,41 @@ class EmailPasswordAuthProvider(BaseAuthProvider):
                 # Get user by email
                 user_record = auth.get_user_by_email(email)
                 
-                # Send verification email
-                auth.send_email_verification(user_record.uid)
+                # Use Firebase Auth REST API to send verification email
+                api_key = self.get_environment_variable('FIREBASE_API_KEY', 'Firebase API key')
                 
-                return VerificationResponse(
-                    message="Verification email resent successfully",
-                    email_verified=user_record.email_verified
-                )
+                # Create custom token and exchange for ID token
+                custom_token = auth.create_custom_token(user_record.uid)
+                
+                # Exchange custom token for ID token
+                exchange_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key={api_key}"
+                exchange_payload = {
+                    "token": custom_token.decode('utf-8'),
+                    "returnSecureToken": True
+                }
+                
+                exchange_response = requests.post(exchange_url, json=exchange_payload)
+                if exchange_response.status_code == 200:
+                    exchange_data = exchange_response.json()
+                    id_token = exchange_data['idToken']
+                    
+                    # Send verification email using REST API
+                    verify_url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={api_key}"
+                    verify_payload = {
+                        "requestType": "VERIFY_EMAIL",
+                        "idToken": id_token
+                    }
+                    
+                    verify_response = requests.post(verify_url, json=verify_payload)
+                    if verify_response.status_code == 200:
+                        return VerificationResponse(
+                            message="Verification email resent successfully",
+                            email_verified=user_record.email_verified
+                        )
+                    else:
+                        raise HTTPException(status_code=500, detail=f"Failed to send verification email: {verify_response.text}")
+                else:
+                    raise HTTPException(status_code=500, detail=f"Failed to get ID token: {exchange_response.text}")
                 
             except auth.UserNotFoundError:
                 raise HTTPException(status_code=404, detail="User not found")

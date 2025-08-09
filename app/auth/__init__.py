@@ -1,23 +1,27 @@
 from fastapi import APIRouter
-from .email_password import EmailPasswordAuthProvider
+from .basic_auth import EmailPasswordAuthProvider
 from .google_oauth import GoogleOAuthProvider
 
-# Create unified authentication router
-auth_router = APIRouter(prefix="/auth", tags=["authentication"])
+# Create main router (no prefix - will be added by main app)
+main_router = APIRouter()
 
 # Initialize email/password auth provider
 email_password_provider = EmailPasswordAuthProvider()
-email_password_provider.setup_routes()
-
-# Create OAuth router
-oauth_router = APIRouter(prefix="/oauth", tags=["oauth"])
 
 # Initialize Google OAuth provider
 google_oauth_provider = GoogleOAuthProvider()
-google_oauth_provider.setup_routes()
 
-# Include OAuth routes in main auth router
-auth_router.include_router(oauth_router)
+# Include email-password routes under /auth prefix
+auth_router = APIRouter(prefix="/auth", tags=["authentication"])
+auth_router.include_router(email_password_provider.router)
 
-# Export the unified router
-__all__ = ['auth_router']
+# Include OAuth routes under /oauth prefix
+oauth_router = APIRouter(prefix="/oauth", tags=["oauth"])
+oauth_router.include_router(google_oauth_provider.router)
+
+# Include both routers in main router
+main_router.include_router(auth_router)
+main_router.include_router(oauth_router)
+
+# Export the main router
+__all__ = ['main_router']

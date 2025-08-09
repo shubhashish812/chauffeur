@@ -108,6 +108,15 @@
                 <p><strong>Display Name:</strong> <span id="userDisplayName"></span></p>
                 <p><strong>Email Verified:</strong> <span id="userEmailVerified"></span></p>
                 <p><strong>Provider:</strong> <span id="userProvider"></span></p>
+                
+                <!-- Email verification section -->
+                <div id="emailVerificationSection" style="display: none;">
+                    <h4>📧 Email Verification</h4>
+                    <p id="verificationStatus"></p>
+                    <button onclick="resendVerificationEmail()" id="resendVerificationBtn">Resend Verification Email</button>
+                    <button onclick="checkVerificationStatus()" id="checkVerificationBtn">Check Verification Status</button>
+                </div>
+                
                 <button onclick="signOut()">Sign Out</button>
             </div>
         </div>
@@ -239,9 +248,86 @@
             
             document.getElementById('userInfo').style.display = 'block';
             
+            // Show email verification section for email/password users
+            if (user.provider === 'email/password' || !user.provider) {
+                document.getElementById('emailVerificationSection').style.display = 'block';
+                updateVerificationStatus(user.email_verified);
+            } else {
+                document.getElementById('emailVerificationSection').style.display = 'none';
+            }
+            
             // Store token and user info in localStorage
             localStorage.setItem('token', token);
             localStorage.setItem('user', JSON.stringify(user));
+        }
+
+        // Update verification status display
+        function updateVerificationStatus(isVerified) {
+            const statusElement = document.getElementById('verificationStatus');
+            const resendBtn = document.getElementById('resendVerificationBtn');
+            
+            if (isVerified) {
+                statusElement.textContent = '✅ Email verified successfully!';
+                statusElement.style.color = '#2e7d32';
+                resendBtn.style.display = 'none';
+            } else {
+                statusElement.textContent = '⚠️ Email not verified. Please check your inbox and click the verification link.';
+                statusElement.style.color = '#f57c00';
+                resendBtn.style.display = 'inline-block';
+            }
+        }
+
+        // Resend verification email
+        async function resendVerificationEmail() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            
+            if (!user.uid) {
+                showMessage('No user found', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/send-verification-email/${user.uid}`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('Verification email sent successfully!', 'success');
+                } else {
+                    showMessage(`Failed to send verification email: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Check verification status
+        async function checkVerificationStatus() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            
+            if (!user.uid) {
+                showMessage('No user found', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/check-verification/${user.uid}`, {
+                    method: 'GET'
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateVerificationStatus(data.email_verified);
+                    showMessage('Verification status updated!', 'success');
+                } else {
+                    showMessage(`Failed to check verification status: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
+            }
         }
 
         // Sign out

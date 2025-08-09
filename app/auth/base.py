@@ -8,9 +8,10 @@ import os
 class BaseAuthProvider(ABC):
     """Base class for all authentication providers"""
     
-    def __init__(self, router: APIRouter):
+    def __init__(self, router: Optional[APIRouter] = None):
         self.router = router
-        self.setup_routes()
+        if self.router:
+            self.setup_routes()
     
     @abstractmethod
     def setup_routes(self):

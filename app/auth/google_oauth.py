@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from firebase_admin import auth
 from typing import Optional, Dict, Any
+import os
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 from google.auth.exceptions import GoogleAuthError
@@ -9,6 +10,11 @@ from .base import BaseAuthProvider, BaseAuthRequest, BaseAuthResponse
 
 class GoogleOAuthProvider(BaseAuthProvider):
     """Google OAuth authentication provider"""
+    
+    def __init__(self):
+        # Create our own router for Google OAuth
+        self.router = APIRouter(prefix="/google", tags=["google-oauth"])
+        super().__init__(self.router)
     
     def setup_routes(self):
         """Setup Google OAuth authentication routes"""
@@ -28,7 +34,7 @@ class GoogleOAuthProvider(BaseAuthProvider):
         class OAuthAuthResponse(BaseAuthResponse):
             user: OAuthUserResponse
 
-        @self.router.post("/google/signin", response_model=OAuthAuthResponse)
+        @self.router.post("/signin", response_model=OAuthAuthResponse)
         async def google_signin(request: GoogleSignInRequest):
             """Sign in with Google OAuth"""
             try:
@@ -70,7 +76,7 @@ class GoogleOAuthProvider(BaseAuthProvider):
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Error during Google signin: {str(e)}")
 
-        @self.router.get("/google/config")
+        @self.router.get("/config")
         async def get_google_config():
             """Get Google OAuth configuration for frontend"""
             try:
@@ -121,20 +127,7 @@ class GoogleOAuthProvider(BaseAuthProvider):
             # Try to get existing user by email
             user_record = auth.get_user_by_email(user_info['email'])
             
-            # Check if user has the same provider linked
-            if hasattr(user_record, 'provider_data'):
-                for provider_data in user_record.provider_data:
-                    if provider_data.provider_id == provider and provider_data.uid == provider_uid:
-                        return user_record
-            
-            # If user exists but doesn't have this provider linked, link it
-            auth.link_provider_with_uid(
-                user_record.uid,
-                auth.ProviderConfig(
-                    provider_id=provider,
-                    provider_uid=provider_uid
-                )
-            )
+            # User exists, return it (we don't need to link providers for this demo)
             return user_record
             
         except auth.UserNotFoundError:
@@ -150,41 +143,12 @@ class GoogleOAuthProvider(BaseAuthProvider):
             user_properties = {k: v for k, v in user_properties.items() if v is not None}
             
             user_record = auth.create_user(**user_properties)
-            
-            # Link the OAuth provider
-            auth.link_provider_with_uid(
-                user_record.uid,
-                auth.ProviderConfig(
-                    provider_id=provider,
-                    provider_uid=provider_uid
-                )
-            )
-            
             return user_record
+            
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error managing user: {str(e)}")
 
     def authenticate(self, credentials: Dict[str, Any]) -> Dict[str, Any]:
         """Authenticate user with Google OAuth"""
-        id_token = credentials.get('id_token')
-        if not id_token:
-            raise HTTPException(status_code=400, detail="Google ID token is required")
-        
-        google_user_info = self.verify_google_token(id_token)
-        
-        user_info = {
-            'email': google_user_info['email'],
-            'email_verified': google_user_info.get('email_verified', False),
-            'display_name': google_user_info.get('name'),
-            'photo_url': google_user_info.get('picture')
-        }
-        
-        user_record = self.get_or_create_firebase_user(
-            provider='google.com',
-            provider_uid=google_user_info['sub'],
-            user_info=user_info
-        )
-        
-        custom_token = auth.create_custom_token(user_record.uid)
-        
-        return self.create_auth_response(user_record, custom_token.decode('utf-8'), 'google')
+        # This method is not used for Google OAuth as it's handled by individual endpoints
+        pass
