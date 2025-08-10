@@ -1,17 +1,8 @@
-from .models import (
-    BasicAuthData, SignupData, SigninData, ResetPasswordData, ChangePasswordData,
-    GoogleAuthData, AuthRequest
-)
 from .basicinterface import BasicAuthInterface
 from .googleauthinterface import GoogleAuthInterface
+from .models import BasicAuthData, GoogleAuthData
 
 AUTH_REGISTRY = {
     "google": (GoogleAuthInterface, GoogleAuthData),
-    "basic": (BasicAuthInterface, BasicAuthData)
+    "basic": (BasicAuthInterface, BasicAuthData),
 }
-
-
-
-
-
-
