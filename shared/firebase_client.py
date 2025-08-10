@@ -33,21 +33,18 @@ class FirebaseClient:
         try:
             # Check if already initialized
             if not firebase_admin._apps:
-                # Use service account key from environment or default credentials
-                if os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
-                    cred = credentials.Certificate(os.getenv('GOOGLE_APPLICATION_CREDENTIALS'))
-                else:
-                    # Use default credentials (works in Cloud Functions)
-                    cred = credentials.ApplicationDefault()
-                
-                firebase_admin.initialize_app(cred)
-                logger.info("Firebase Admin SDK initialized successfully")
+                # In Cloud Functions, use default credentials
+                # The service account is automatically available
+                firebase_admin.initialize_app()
+                logger.info("Firebase Admin SDK initialized successfully with default credentials")
             else:
                 logger.info("Firebase Admin SDK already initialized")
                 
         except Exception as e:
             logger.error(f"Failed to initialize Firebase: {e}")
-            raise
+            # Don't raise the exception, just log it
+            # This allows the function to start even if Firebase fails
+            logger.warning("Continuing without Firebase initialization")
     
     def get_auth(self):
         """Get Firebase Auth client"""

@@ -1,3 +1,4 @@
+# Unified requirements for all Chauffeur Cloud Functions
 functions-framework==3.*
 firebase-admin>=7.0.0
 pydantic>=2.0.0
@@ -5,3 +6,4 @@ requests>=2.31.0
 google-auth>=2.23.4
 google-auth-oauthlib>=1.1.0
 email-validator>=2.1.0
+flask>=2.3.0
