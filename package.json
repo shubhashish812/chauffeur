@@ -1,0 +1,32 @@
+{
+  "name": "chauffeur-cloud-functions",
+  "version": "1.0.0",
+  "description": "Chauffeur Cloud Functions using Serverless Framework",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "npx serverless deploy",
+    "deploy:prod": "npx serverless deploy --stage prod",
+    "deploy:dev": "npx serverless deploy --stage dev",
+    "remove": "npx serverless remove",
+    "info": "npx serverless info",
+    "logs": "npx serverless logs -f auth",
+    "logs:oauth": "npx serverless logs -f oauth",
+    "logs:user": "npx serverless logs -f user"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.1"
+  },
+  "devDependencies": {
+    "serverless": "^3.38.0",
+    "serverless-google-cloudfunctions": "^3.1.0"
+  },
+  "keywords": [
+    "serverless",
+    "gcp",
+    "cloud-functions",
+    "firebase",
+    "oauth"
+  ],
+  "author": "Chauffeur Team",
+  "license": "MIT"
+}

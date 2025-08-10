@@ -1,183 +1,184 @@
-## Getting Started
+# Chauffeur - Cloud Functions Architecture
 
-### 1. Setting up WSL (Windows Subsystem for Linux)
+Scalable serverless architecture for the Chauffeur platform using GCP Cloud Functions.
 
-1. Open **PowerShell as Administrator** and run:
-   ```powershell
-   wsl --install
-   ```
-   - This installs WSL and Ubuntu by default. If prompted, restart your computer.
-2. Open **Ubuntu** from the Start menu OR if prompted during the installation itself and set up your Linux username and password.
-
-### 2. Installing make and Python venv in WSL
-
-1. In your Ubuntu/WSL terminal, run:
-   ```sh
-   sudo apt update
-   sudo apt install make python3.12-venv
-   ```
-
-### 3. (Optional) Remove sudo password prompt for your user
-
-1. In your WSL terminal, run:
-   ```sh
-   sudo visudo
-   ```
-2. Add this line at the end (replace `yourusername` with your Linux username, check with `whoami`):
-   ```
-   yourusername ALL=(ALL) NOPASSWD:ALL
-   ```
-3. Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X` if using nano).
-
-### 4. Project Setup and Usage
-
-1. Navigate to your project directory (replace with your actual path):
-   ```sh
-   cd /mnt/c/Users/YourName/WorkSpace/chauffeur
-   ```
-2. Create and activate a virtual environment:
-   ```sh
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
-3. Install all dependencies inside the virtual environment:
-   ```sh
-   make install (OR use the pip directly)
-   pip install -r requirements-dev.txt
-   ```
-4. Start the development server:
-   ```sh
-   make start
-   ```
-5. Build the Docker image:
-   ```sh
-   make build-dev
-   ```
-6. Run the Docker container:
-   ```sh
-   make run-dev
-   ```
-
----
-
-## Authentication
-
-The application uses a scalable authentication architecture with a base class system that supports multiple authentication providers.
-
-### Architecture Overview
+## 🏗️ Architecture
 
 ```
-app/auth/
-├── base.py              # Base authentication provider class
-├── email_password.py    # Email/password authentication provider
-├── google_oauth.py      # Google OAuth authentication provider
-└── __init__.py          # Package exports
+chauffeur/
+├── handlers/              # Cloud Functions (new architecture)
+│   ├── functions/         # Individual Cloud Functions
+│   │   ├── auth/         # Authentication functions
+│   │   ├── oauth/        # OAuth functions  
+│   │   └── shared/       # Shared utilities
+│   ├── client/           # Python client library
+│   └── scripts/          # Deployment scripts
+├── serverless.yaml        # Serverless configuration
+├── package.json           # Node.js dependencies
+└── deploy.sh             # Deployment script
 ```
 
-### Email/Password Authentication
+## 🚀 Quick Start
 
-The application supports traditional email/password authentication:
+### 1. Install Dependencies
+```bash
+npm install
+```
 
-- **Sign Up**: `POST /auth/signup`
-- **Sign In**: `POST /auth/signin`
-- **Sign Out**: `POST /auth/signout/{uid}`
-- **Get User**: `GET /auth/user/{uid}`
-- **Delete User**: `DELETE /auth/user/{uid}`
-- **Verify Token**: `POST /auth/verify-token`
-- **Exchange Custom Token**: `POST /auth/exchange-custom-token`
-- **Refresh Token**: `POST /auth/refresh-token`
+### 2. Set Environment Variables
+```bash
+export FIREBASE_API_KEY="your-firebase-api-key"
+export GOOGLE_OAUTH_CLIENT_ID="your-google-oauth-client-id"
+```
 
-### Google OAuth Authentication
+### 3. Deploy
+```bash
+npm run deploy
+# or
+./deploy.sh
+```
 
-The application supports Google OAuth for seamless authentication:
+## 📊 Function Endpoints
 
-#### Setup Instructions
+| Function | Endpoint | Purpose |
+|----------|----------|---------|
+| `chauffeur-auth` | `/auth/*` | User registration, login, token management |
+| `chauffeur-oauth` | `/oauth/*` | Google OAuth authentication |
+| `chauffeur-user` | `/user/*` | User profile management |
 
-See the detailed setup guide in [GOOGLE_OAUTH_SETUP.md](GOOGLE_OAUTH_SETUP.md)
+## 🔧 Configuration
 
-#### Quick Setup
+### Environment Variables
+- `FIREBASE_API_KEY`: Firebase project API key
+- `GOOGLE_OAUTH_CLIENT_ID`: Google OAuth client ID
+- `GCP_PROJECT_ID`: GCP project ID (auto-detected)
 
-1. **Get Google OAuth Client ID**:
-   - Follow the guide in `GOOGLE_OAUTH_SETUP.md`
-   - Or use the quick steps below
+### serverless.yaml
+Main configuration file defining:
+- Function handlers and routes
+- Environment variables
+- GCP resources (secrets, storage)
+- Memory, timeout, and scaling settings
 
-2. **Set Environment Variables**:
+## 📈 Monitoring
+
+- **GCP Console**: https://console.cloud.google.com/functions/list
+- **Logs**: `npm run logs`
+- **Metrics**: Available in GCP Cloud Monitoring
+
+## 🔄 Development
+
+### Add New Functions
+1. Create function in `handlers/functions/`
+2. Add to `serverless.yaml`
+3. Deploy with `npm run deploy`
+
+### Update Functions
+```bash
+npm run deploy
+```
+
+### View Logs
+```bash
+npm run logs
+npm run logs:oauth
+npm run logs:user
+```
+
+## 🗑️ Cleanup
+
+Remove all deployed resources:
+```bash
+npm run remove
+```
+
+## 📋 serverless.yaml Configuration
+
+### Functions Section
+```yaml
+functions:
+  auth:
+    handler: handlers/functions/auth/main.py
+    events:
+      - http:
+          path: /auth/{proxy+}
+          method: ANY
+    environment:
+      FIREBASE_API_KEY: ${env:FIREBASE_API_KEY}
+    memory: 256MB
+    timeout: 60s
+```
+
+### Resources Section
+```yaml
+resources:
+  - name: firebase-api-key-secret
+    type: gcp-types/secretmanager-v1:projects.secrets
+    properties:
+      parent: projects/${env:GCP_PROJECT_ID}
+      secretId: firebase-api-key
+```
+
+## 🔧 Available Commands
+
+```bash
+# Deploy all functions
+npm run deploy
+
+# Deploy to specific environment
+npm run deploy:prod
+npm run deploy:dev
+
+# Remove all functions
+npm run remove
+
+# View function info
+npm run info
+
+# View logs
+npm run logs
+npm run logs:oauth
+npm run logs:user
+```
+
+## 🌐 Function URLs
+
+After deployment, your functions will be available at:
+- **Auth**: `https://us-central1-YOUR_PROJECT.cloudfunctions.net/auth`
+- **OAuth**: `https://us-central1-YOUR_PROJECT.cloudfunctions.net/oauth`
+- **User**: `https://us-central1-YOUR_PROJECT.cloudfunctions.net/user`
+
+## 🆚 Comparison with AWS serverless.yml
+
+| Feature | AWS serverless.yml | GCP serverless.yaml |
+|---------|-------------------|---------------------|
+| **Provider** | `provider: aws` | `provider: google` |
+| **Runtime** | `runtime: nodejs18.x` | `runtime: python310` |
+| **Events** | `events: - httpApi` | `events: - http` |
+| **Environment** | `environment:` | `environment:` |
+| **Resources** | `resources:` | `resources:` |
+
+## 🛠️ Troubleshooting
+
+### Common Issues
+
+1. **Permission Denied**: Ensure you're authenticated with GCP
    ```bash
-   export GOOGLE_OAUTH_CLIENT_ID="your-google-client-id"
-   export FIREBASE_API_KEY="your-firebase-api-key"
+   gcloud auth application-default login
    ```
 
-3. **API Endpoints**:
-   - **Google Sign In**: `POST /oauth/google/signin`
-   - **Get Google Config**: `GET /oauth/google/config`
+2. **Environment Variables Not Set**: Check your exports
+   ```bash
+   echo $FIREBASE_API_KEY
+   echo $GOOGLE_OAUTH_CLIENT_ID
+   ```
 
-#### Frontend Integration Example
+3. **Function Deployment Fails**: Check logs
+   ```bash
+   npm run logs
+   ```
 
-```javascript
-// Initialize Google Sign-In
-function initializeGoogleSignIn() {
-  google.accounts.id.initialize({
-    client_id: 'YOUR_GOOGLE_CLIENT_ID',
-    callback: handleCredentialResponse
-  });
-}
+## 📚 Additional Documentation
 
-// Handle the credential response
-async function handleCredentialResponse(response) {
-  try {
-    const result = await fetch('/oauth/google/signin', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        id_token: response.credential
-      })
-    });
-    
-    const data = await result.json();
-    // Store the token and user info
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
-  } catch (error) {
-    console.error('Google sign-in failed:', error);
-  }
-}
-```
-
-### Scalable Architecture
-
-The authentication system is designed to be scalable and easily extensible:
-
-- **Base Class System**: All auth providers inherit from `BaseAuthProvider`
-- **Provider-Agnostic**: The system can accommodate multiple OAuth providers
-- **Unified User Management**: All users (email/password and OAuth) are stored in Firebase Auth
-- **Consistent API**: All authentication methods return the same response format
-- **Easy Extension**: Adding new providers follows the same pattern
-
-#### Adding New OAuth Providers
-
-To add new OAuth providers (Facebook, GitHub, etc.):
-
-1. Create a new provider class in `app/auth/` (e.g., `facebook_oauth.py`)
-2. Inherit from `BaseAuthProvider`
-3. Implement the required methods (`setup_routes`, `authenticate`)
-4. Add the provider to `app/auth_router.py`
-5. Follow the same pattern as Google OAuth
-
-Example:
-```python
-class FacebookOAuthProvider(BaseAuthProvider):
-    def setup_routes(self):
-        # Implement Facebook OAuth routes
-        pass
-    
-    def authenticate(self, credentials):
-        # Implement Facebook authentication
-        pass
-```
-
----
-
-- Root endpoint: `/`
-- Example endpoint: `/hello` 
+- [Secrets Management](handlers/SECRETS_SETUP.md)
+- [Client Library Usage](handlers/example_usage.py) 

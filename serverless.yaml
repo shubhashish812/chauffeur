@@ -1,0 +1,56 @@
+service: chauffeur-cloud-functions
+
+provider:
+  name: google
+  project: ${env:GCP_PROJECT_ID}
+  region: us-central1
+  runtime: python310
+
+plugins:
+  - serverless-google-cloudfunctions
+
+package:
+  patterns:
+    - '!node_modules/**'
+    - '!tests/**'
+    - '!*.pyc'
+    - '!.git/**'
+
+functions:
+  auth:
+    handler: main
+    events:
+      - http:
+          path: /auth/{proxy+}
+          method: ANY
+    environment:
+      FIREBASE_API_KEY: ${env:FIREBASE_API_KEY}
+      GOOGLE_OAUTH_CLIENT_ID: ${env:GOOGLE_OAUTH_CLIENT_ID}
+    memory: 256MB
+    timeout: 60s
+    maxInstances: 100
+
+  oauth:
+    handler: main
+    events:
+      - http:
+          path: /oauth/{proxy+}
+          method: ANY
+    environment:
+      FIREBASE_API_KEY: ${env:FIREBASE_API_KEY}
+      GOOGLE_OAUTH_CLIENT_ID: ${env:GOOGLE_OAUTH_CLIENT_ID}
+    memory: 256MB
+    timeout: 60s
+    maxInstances: 100
+
+  user:
+    handler: main
+    events:
+      - http:
+          path: /user/{proxy+}
+          method: ANY
+    environment:
+      FIREBASE_API_KEY: ${env:FIREBASE_API_KEY}
+    memory: 256MB
+    timeout: 60s
+    maxInstances: 100
