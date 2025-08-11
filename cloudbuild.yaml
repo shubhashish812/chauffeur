@@ -1,0 +1,83 @@
+steps:
+  # Step 0: Detect changed handlers
+  - name: 'gcr.io/cloud-builders/git'
+    id: 'Detect handlers'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "[INFO] Detecting changed handlers..."
+        ${_CHANGED}=$(git diff --name-only HEAD~1 HEAD | grep '^handlers/.*\.py$' || true)
+
+        if [ -z "${_CHANGED}" ]; then
+          echo "[INFO] No handler changes detected."
+          touch /workspace/changed_handlers.txt
+        else
+          echo "${_CHANGED}" > /workspace/changed_handlers.txt
+        fi
+
+        echo "[INFO] Changed handlers:"
+        cat /workspace/changed_handlers.txt
+
+
+  # Step 1: Install dependencies
+  - name: 'python:3.13'
+    id: 'Install dependencies'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt -t .; fi
+
+  # Step 2: Loop through each changed handler and deploy
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Deploy handlers'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        _REGION=${_REGION}
+        _RUNTIME=${_RUNTIME}
+        PROJECT_ID=${PROJECT_ID}
+
+        while read _HANDLER_FILE; do
+          [ -z "${_HANDLER_FILE}" ] && continue
+
+          _HANDLER_MODULE=$(echo "${_HANDLER_FILE}" | sed 's|/|.|g' | sed 's|.py$||')
+          _HANDLER_NAME=$(basename "${_HANDLER_FILE}" .py)
+
+          echo "[INFO] Preparing ${_HANDLER_NAME} from ${_HANDLER_MODULE}"
+
+          # Create main.py for this handler
+          echo "from ${_HANDLER_MODULE} import ${_HANDLER_NAME}" > main.py
+
+          # Deploy the handler with secrets mounted as env vars
+          gcloud functions deploy ${_HANDLER_NAME} \
+            --gen2 \
+            --runtime=${_RUNTIME} \
+            --region=${_REGION} \
+            --source=. \
+            --entry-point=${_HANDLER_NAME} \
+            --trigger-http \
+            --allow-unauthenticated \
+            --memory=256MB \
+            --timeout=60s \
+            --set-secrets=MY_SECRET=projects/${PROJECT_ID}/secrets/my_secret_name:latest
+
+          # Set IAM policy for public HTTP access
+          _SERVICE_NAME=$(gcloud functions describe ${_HANDLER_NAME} --gen2 --region=${_REGION} --format='value(serviceConfig.service)')
+          gcloud run services add-iam-policy-binding ${_SERVICE_NAME} \
+            --region=${_REGION} \
+            --member=allUsers \
+            --role=roles/run.invoker
+
+        done < /workspace/changed_handlers.txt
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _REGION: us-central1
+  _RUNTIME: python313
+  _CHANGED: ''
