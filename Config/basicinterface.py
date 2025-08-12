@@ -43,7 +43,6 @@ class BasicAuthInterface(BaseAuthInterface):
             user_properties = {
                 "email": signup_data.email,
                 "password": signup_data.password,
-                "email_verified": False,
             }
 
             if signup_data.display_name:
