@@ -61,7 +61,6 @@ def auth_handler(request: Request) -> Response:
         return create_response(data=result)
 
     except Exception as e:
-        logger.error(f"Error in auth handler: {e}")
         return create_response(
             error=f"Authentication failed: {str(e)}", status_code=500
         )

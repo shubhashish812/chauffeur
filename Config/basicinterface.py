@@ -6,8 +6,13 @@ Handles email/password authentication operations
 import logging
 from typing import Any, Dict
 
-from Config.models import ChangePasswordData, ResetPasswordData, SigninData, SignupData
-from shared.auth_utils import AuthUtils
+from Config.models import (
+    ChangePasswordData,
+    ResetPasswordData,
+    SigninData,
+    SignupData,
+    UserRecord,
+)
 from shared.firebase_client import firebase_client
 
 from .base import BaseAuthInterface
@@ -34,6 +39,18 @@ class BasicAuthInterface(BaseAuthInterface):
         """
         Register new user with email/password
         Returns user data and authentication tokens
+
+        Response format:
+        {
+            "uid": "ZY1rJK0eYLg...",
+            "email": "[user@example.com]",
+            "display_name": "",
+            "email_verified": false,
+            "provider_data": [],
+            "phone_number": null,
+            "photo_url": null,
+            "disabled": false
+        }
         """
         try:
             # Validate data using Pydantic model
@@ -56,12 +73,7 @@ class BasicAuthInterface(BaseAuthInterface):
             except Exception as e:
                 logger.warning(f"Failed to send verification email: {e}")
 
-            # Create complete user response with tokens
-            response_data = self.create_user_response_with_tokens(
-                user_record=user_record, provider="email"
-            )
-
-            return response_data
+            return UserRecord.from_firebase_user(user_record).model_dump(mode="json")
 
         except Exception as e:
             logger.error(f"Error in signup: {e}")
@@ -71,15 +83,21 @@ class BasicAuthInterface(BaseAuthInterface):
         """
         Authenticate user with email/password
         Returns user data and authentication tokens
+
+        Response format:
+        {
+            "localId": "ZY1rJK0eYLg...",
+            "email": "[user@example.com]",
+            "displayName": "",
+            "idToken": "[ID_TOKEN]",
+            "registered": true,
+            "refreshToken": "[REFRESH_TOKEN]",
+            "expiresIn": "3600"
+        }
         """
         try:
             # Validate data using Pydantic model
             signin_data = SigninData(**self.request_data["data"])
-
-            # Sign in with Firebase REST API
-            auth_data = AuthUtils.sign_in_with_password(
-                email=signin_data.email, password=signin_data.password
-            )
 
             # Get user record
             user_record = self.get_user_by_email(signin_data.email)
@@ -90,17 +108,12 @@ class BasicAuthInterface(BaseAuthInterface):
                     "Email verification required. Please check your email and click the verification link."
                 )
 
-            # Create complete user response with tokens
-            response_data = self.create_user_response_with_tokens(
-                user_record=user_record, provider="email"
+            # Sign in with Firebase REST API
+            auth_data = firebase_client.sign_in_with_password(
+                email=signin_data.email, password=signin_data.password
             )
 
-            # Add Firebase REST API tokens if available (for backward compatibility)
-            if "refreshToken" in auth_data:
-                response_data["firebase_refresh_token"] = auth_data["refreshToken"]
-                response_data["firebase_expires_in"] = auth_data.get("expiresIn")
-
-            return response_data
+            return auth_data
 
         except Exception as e:
             logger.error(f"Error in signin: {e}")
@@ -141,10 +154,10 @@ class BasicAuthInterface(BaseAuthInterface):
 
             # Create custom token and exchange for ID token
             custom_token = firebase_client.create_custom_token(user_record.uid)
-            AuthUtils.exchange_custom_token(custom_token)
+            firebase_client.exchange_custom_token(custom_token)
 
             # Send password reset email using Firebase REST API
-            api_key = AuthUtils.get_firebase_api_key()
+            api_key = firebase_client.get_firebase_api_key()
             url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={api_key}"
 
             payload = {"requestType": "PASSWORD_RESET", "email": reset_data.email}

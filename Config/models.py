@@ -1,5 +1,6 @@
 from typing import Optional
 
+from firebase_admin import auth
 from pydantic import BaseModel, EmailStr, field_validator
 
 
@@ -57,3 +58,27 @@ class AuthRequest(BaseModel):
     type: str
     action: str
     data: dict  # Will be validated based on action
+
+
+class UserRecord(BaseModel):
+    """Firebase UserRecord model"""
+
+    uid: str
+    email: EmailStr
+    email_verified: bool
+    phone_number: Optional[str] = None
+    display_name: Optional[str] = None
+    photo_url: Optional[str] = None
+    disabled: bool
+
+    @classmethod
+    def from_firebase_user(cls, user: auth.UserRecord):
+        return cls(
+            uid=user.uid,
+            email=user.email,
+            email_verified=user.email_verified,
+            phone_number=user.phone_number,
+            display_name=user.display_name,
+            photo_url=user.photo_url,
+            disabled=user.disabled,
+        )
