@@ -6,25 +6,21 @@ from shared.utils import create_response
 
 @functions_framework.http
 def ride_handler(request):
+    if request.is_json:
+        request_data = request.get_json()
+    else:
+        return create_response(error="Request must be JSON", status_code=400)
+
     try:
-        # Parse request data
-        if request.is_json:
-            request_data = request.get_json()
-        else:
-            return create_response(error="Request must be JSON", status_code=400)
-
-        # Initialize ride interface with request data
-        try:
-            interface = RideInterface(**request_data)
-        except (ValueError, TypeError) as e:
-            return create_response(
-                error=f"Invalid request structure: {str(e)}", status_code=400
-            )
-
-        # Dynamically call action method
+        interface = RideInterface(**request_data)
+    except (ValueError, TypeError) as e:
+        return create_response(
+            error=f"Invalid request structure: {str(e)}", status_code=400
+        )
+    try:
+        # Dispatch method based on type
         method = getattr(interface, interface.type.value)
         result = method()
         return create_response(data=result)
-
     except Exception as e:
         return create_response(error=f"Request failed: {str(e)}", status_code=500)
