@@ -1,7 +1,9 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from firebase_admin import auth
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from shared.firestore_mixin import FirestoreSyncMixin
 
 
 class BasicAuthData(BaseModel):
@@ -21,6 +23,7 @@ class SignupData(BasicAuthData):
     """Data model for signup action"""
 
     display_name: Optional[str] = None
+    role: Literal["driver", "rider"] = Field(..., description="User role in the system")
 
 
 class SigninData(BasicAuthData):
@@ -82,3 +85,40 @@ class UserRecord(BaseModel):
             photo_url=user.photo_url,
             disabled=user.disabled,
         )
+
+
+class UserProfile(BaseModel):
+    """User profile model for Firestore collection"""
+
+    uid: str = Field(..., description="Firebase UID")
+    name: Optional[str] = Field(..., description="User's display name")
+    email: EmailStr = Field(..., description="User's email address")
+    role: Literal["driver", "rider"] = Field(..., description="User role in the system")
+    status: Literal["online", "offline"] = Field(
+        default="offline", description="User's current status"
+    )
+    location: Optional[dict] = Field(
+        default=None, description="User's current location (lat, lng)"
+    )
+    phone_number: Optional[str] = Field(default=None, description="User's phone number")
+    photo_url: Optional[str] = Field(
+        default=None, description="User's profile photo URL"
+    )
+
+    @field_validator("location")
+    def validate_location(cls, v):
+        if v is not None:
+            if not isinstance(v, dict) or "lat" not in v or "lng" not in v:
+                raise ValueError("Location must contain 'lat' and 'lng' fields")
+            if not isinstance(v["lat"], (int, float)) or not isinstance(
+                v["lng"], (int, float)
+            ):
+                raise ValueError("Latitude and longitude must be numbers")
+        return v
+
+
+class User(FirestoreSyncMixin):
+    """User class for Firestore operations"""
+
+    collection_name = "users"
+    model = UserProfile

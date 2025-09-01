@@ -11,6 +11,8 @@ from Config.models import (
     ResetPasswordData,
     SigninData,
     SignupData,
+    User,
+    UserProfile,
     UserRecord,
 )
 from shared.firebase_client import firebase_client
@@ -66,6 +68,28 @@ class BasicAuthInterface(BaseAuthInterface):
                 user_properties["display_name"] = signup_data.display_name
 
             user_record = firebase_client.create_user(**user_properties)
+
+            # Create user profile in Firestore
+            try:
+                user_profile = UserProfile(
+                    uid=user_record.uid,
+                    name=signup_data.display_name or signup_data.email.split("@")[0],
+                    email=signup_data.email,
+                    role=signup_data.role,
+                    status="offline",  # Default to offline
+                    phone_number=user_record.phone_number,
+                    photo_url=user_record.photo_url,
+                )
+
+                User.sync(doc_id=user_profile.uid, data=user_profile, create=True)
+                logger.info(
+                    f"Created user profile in Firestore for UID: {user_record.uid}"
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to create user profile in Firestore: {e}")
+                # Don't fail the signup if profile creation fails
+                # The user can still authenticate, profile can be created later
 
             # Send verification email
             try:
