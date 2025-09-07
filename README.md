@@ -18,6 +18,7 @@ GOOGLE_OAUTH_CLIENT_ID=your_google_oauth_client_id
 # Google Cloud Configuration (for local development)
 GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account-key.json
 GOOGLE_CLOUD_PROJECT=your_project_id
+PUBSUB_TOPIC_NAME=your_request_listener
 ```
 
 ### Installation
