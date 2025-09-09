@@ -3,10 +3,10 @@ from typing import Any, Dict, Type, Union
 from google.cloud.firestore_v1 import SERVER_TIMESTAMP
 from pydantic import BaseModel
 
-from shared.firebase_client import firebase_client
+from shared.firebase import firebase_client
 
 
-class FirestoreSyncMixin:
+class FirestoreClient:
     """Reusable mixin to simplify Firestore create/update with Pydantic models + timestamps."""
 
     collection_name: str  # must be set in subclasses

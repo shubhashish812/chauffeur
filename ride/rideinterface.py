@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from ride.models import Ride, RideCollection, RideRequest
 from shared.pubsub import pubsub_publisher
+from shared.rtdb import rtdb_client
 
 
 class RideType(str, Enum):
@@ -33,12 +34,11 @@ class RideInterface:
                 origin=ride_request.origin,
                 destination=ride_request.destination,
                 status="request",
+                blacklistedDrivers=[],
             )
 
             RideCollection.sync(ride_id, ride_data, create=True)
-
-            # Publish to Pub/Sub for driver matching
-            pubsub_success = pubsub_publisher.publish(ride_data.model_dump())
+            pubsub_success = pubsub_publisher.publish({"rideId": ride_id})
 
             return {
                 "rideId": ride_id,
@@ -63,3 +63,26 @@ class RideInterface:
 
     def cancel(self):
         pass
+
+    @staticmethod
+    def matchmake(ride_id: str) -> Dict[str, Any]:
+        """
+        Static method to process ride request for driver matching
+        Fetches ride from Firestore and searches for nearest drivers
+        """
+        try:
+            ride = RideCollection.get(ride_id)
+            if not ride:
+                raise Exception(f"Ride not found: {ride_id}")
+
+            nearest_drivers = rtdb_client.search("available")
+
+            return {
+                "rideId": ride_id,
+                "status": "processing",
+                "driversFound": len(nearest_drivers),
+                "message": "Ride request processed for matching",
+            }
+
+        except Exception as e:
+            raise Exception(f"Failed to process ride request: {str(e)}")

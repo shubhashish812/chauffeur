@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 
 import firebase_admin
 import requests
-from firebase_admin import auth, credentials, exceptions, firestore
+from firebase_admin import auth, credentials, db, exceptions, firestore
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +34,28 @@ class FirebaseClient:
     # ENVIRONMENT CONSTRUCTOR METHODS
     # =========================================================================
 
+    def _validate_environment(self):
+        """Validate all required environment variables"""
+        required_env_vars = [
+            "FIREBASE_RTDB_URL",
+            "FIREBASE_API_KEY",
+            "GOOGLE_OAUTH_CLIENT_ID",
+            "GOOGLE_CLOUD_PROJECT",
+        ]
+
+        missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+
+        if missing_vars:
+            raise ValueError(
+                f"Missing required environment variables: {', '.join(missing_vars)}"
+            )
+
     def _initialize_firebase(self):
         """Initialize Firebase Admin SDK"""
         try:
+            # Validate all required environment variables
+            self._validate_environment()
+
             # Check if already initialized
             if not firebase_admin._apps:
                 # In Cloud Functions, use default credentials
@@ -48,7 +67,11 @@ class FirebaseClient:
                         os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
                     )
                     firebase_admin.initialize_app(
-                        cred, {"projectId": os.getenv("GOOGLE_CLOUD_PROJECT")}
+                        cred,
+                        {
+                            "projectId": os.getenv("GOOGLE_CLOUD_PROJECT"),
+                            "databaseURL": os.getenv("FIREBASE_RTDB_URL"),
+                        },
                     )
                     logger.info(
                         "Firebase Admin SDK initialized locally with service account"
@@ -71,19 +94,17 @@ class FirebaseClient:
         """Get Firestore client"""
         return firestore.client(database_id=database_id)
 
+    def get_rtdb(self):
+        """Get Realtime Database client"""
+        return db.reference("/")
+
     def get_firebase_api_key(self) -> str:
         """Get Firebase API key from environment"""
-        api_key = os.getenv("FIREBASE_API_KEY")
-        if not api_key:
-            raise ValueError("FIREBASE_API_KEY environment variable not set")
-        return api_key
+        return os.getenv("FIREBASE_API_KEY")
 
     def get_google_client_id(self) -> str:
         """Get Google OAuth client ID from environment"""
-        client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
-        if not client_id:
-            raise ValueError("GOOGLE_OAUTH_CLIENT_ID environment variable not set")
-        return client_id
+        return os.getenv("GOOGLE_OAUTH_CLIENT_ID")
 
     # =========================================================================
     # USER MANAGEMENT METHODS

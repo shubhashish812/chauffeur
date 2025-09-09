@@ -12,7 +12,7 @@ from google.cloud import pubsub_v1
 logger = logging.getLogger(__name__)
 
 
-class PubSubPublisher:
+class PubSubClient:
     """Generic Pub/Sub publisher for various use cases"""
 
     def __init__(self):
@@ -51,4 +51,4 @@ class PubSubPublisher:
             return False
 
 
-pubsub_publisher = PubSubPublisher()
+pubsub_publisher = PubSubClient()

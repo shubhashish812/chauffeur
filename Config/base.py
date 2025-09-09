@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 from firebase_admin.auth import UserRecord
 
-from shared.firebase_client import firebase_client
+from shared.firebase import firebase_client
 
 logger = logging.getLogger(__name__)
 

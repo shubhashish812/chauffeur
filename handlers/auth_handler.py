@@ -8,8 +8,8 @@ import logging
 import functions_framework
 from flask import Request, Response
 
-from Config import AUTH_REGISTRY
-from Config.models import AuthRequest
+from config import AUTH_REGISTRY
+from config.models import AuthRequest
 from shared.utils import create_response
 
 logger = logging.getLogger(__name__)

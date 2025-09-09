@@ -1,8 +1,8 @@
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from shared.firestore_mixin import FirestoreSyncMixin
+from shared.firestore import FirestoreClient
 
 
 class Location(BaseModel):
@@ -23,6 +23,10 @@ class Ride(BaseModel):
     status: Literal[
         "request", "accept", "arriving", "active", "completed", "cancelled"
     ] = Field(default="request", description="Current ride status")
+    blacklistedDrivers: List[str] = Field(
+        default_factory=list,
+        description="List of driver UIDs who rejected the matching",
+    )
 
     @field_validator("origin", "destination", mode="before")
     def validate_location(cls, v):
@@ -45,7 +49,7 @@ class RideRequest(BaseModel):
     destination: Location = Field(..., description="Dropoff location")
 
 
-class RideCollection(FirestoreSyncMixin):
+class RideCollection(FirestoreClient):
     """Ride class for Firestore operations"""
 
     collection_name = "rides"

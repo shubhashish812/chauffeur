@@ -3,7 +3,7 @@ from typing import Literal, Optional
 from firebase_admin import auth
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from shared.firestore_mixin import FirestoreSyncMixin
+from shared.firestore import FirestoreClient
 
 
 class BasicAuthData(BaseModel):
@@ -117,7 +117,7 @@ class UserProfile(BaseModel):
         return v
 
 
-class User(FirestoreSyncMixin):
+class User(FirestoreClient):
     """User class for Firestore operations"""
 
     collection_name = "users"

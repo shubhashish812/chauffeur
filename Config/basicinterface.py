@@ -15,7 +15,7 @@ from Config.models import (
     UserProfile,
     UserRecord,
 )
-from shared.firebase_client import firebase_client
+from shared.firebase import firebase_client
 
 from .base import BaseAuthInterface
 

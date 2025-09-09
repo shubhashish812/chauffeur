@@ -14,6 +14,7 @@ Create a `.env` file in the root directory:
 # Firebase Configuration
 FIREBASE_API_KEY=your_firebase_api_key
 GOOGLE_OAUTH_CLIENT_ID=your_google_oauth_client_id
+FIREBASE_RTDB_URL=https://your-project-id-default-rtdb.firebaseio.com
 
 # Google Cloud Configuration (for local development)
 GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account-key.json
