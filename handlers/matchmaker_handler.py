@@ -37,17 +37,12 @@ def matchmaker_handler(cloud_event: CloudEvent):
         else:
             message_payload = message_data.get("data", {})
 
-        if not message_payload or "rideId" not in message_payload:
-            logger.error("No rideId found in message")
-            return
-
         ride_id = message_payload["rideId"]
         logger.info(f"Processing ride request for rideId: {ride_id}")
 
-        # Call static matchmake method
-        result = RideInterface.matchmake(ride_id)
+        RideInterface.matchmake(ride_id)
 
-        logger.info(f"Successfully processed ride request: {result}")
+        logger.info(f"Successfully processed ride request for rideId: {ride_id}")
 
     except Exception as e:
         logger.error(f"Matchmaker handler failed: {str(e)}")

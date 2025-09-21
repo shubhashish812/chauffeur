@@ -1,10 +1,14 @@
+import logging
 import uuid
 from enum import Enum
 from typing import Any, Dict
 
 from ride.models import Ride, RideCollection, RideRequest
+from shared.fcm import fcm_service
 from shared.pubsub import pubsub_publisher
 from shared.rtdb import rtdb_client
+
+logger = logging.getLogger(__name__)
 
 
 class RideType(str, Enum):
@@ -75,14 +79,38 @@ class RideInterface:
             if not ride:
                 raise Exception(f"Ride not found: {ride_id}")
 
-            nearest_drivers = rtdb_client.search("available")
+            nearest_drivers = rtdb_client.search(
+                origin_lat=ride.origin.lat,
+                origin_lng=ride.origin.lng,
+                blacklisted_drivers=ride.blacklistedDrivers,
+                max_distance_km=10.0,  # Configurable search radius
+            )
 
-            return {
-                "rideId": ride_id,
-                "status": "processing",
-                "driversFound": len(nearest_drivers),
-                "message": "Ride request processed for matching",
-            }
+            if not nearest_drivers:
+                logger.warning(f"No available drivers found for ride {ride_id}")
+                return
+
+            closest_driver = nearest_drivers[0]
+            driver_uid = closest_driver["driverUid"]
+            logger.info(f"Found closest driver {driver_uid} for ride {ride_id}")
+
+            # Check if driver has FCM token
+            driver_fcm_token = closest_driver.get("fcmToken")
+            if not driver_fcm_token:
+                raise Exception(f"Driver {driver_uid} has no FCM token")
+
+            # Send FCM notification
+            fcm_service.send_ride_request_notification(
+                driver_fcm_token=driver_fcm_token,
+                ride_id=ride_id,
+                rider_uid=ride.riderUid,
+                origin={"lat": ride.origin.lat, "lng": ride.origin.lng},
+                destination={"lat": ride.destination.lat, "lng": ride.destination.lng},
+                rider_name="Rider",  # TODO: Get actual rider name
+            )
+
+            logger.info(f"FCM notification sent to driver {driver_uid}")
+            return
 
         except Exception as e:
             raise Exception(f"Failed to process ride request: {str(e)}")
