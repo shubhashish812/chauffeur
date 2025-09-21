@@ -1,26 +1,5 @@
 steps:
-  # Step 0: Detect changed handlers
-  - name: 'gcr.io/cloud-builders/git'
-    id: 'Detect handlers'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        echo "[INFO] Detecting changed handlers..."
-        ${_CHANGED}=$(git diff --name-only HEAD~1 HEAD | grep '^handlers/.*\.py$' || true)
-
-        if [ -z "${_CHANGED}" ]; then
-          echo "[INFO] No handler changes detected."
-          touch /workspace/changed_handlers.txt
-        else
-          echo "${_CHANGED}" > /workspace/changed_handlers.txt
-        fi
-
-        echo "[INFO] Changed handlers:"
-        cat /workspace/changed_handlers.txt
-
-
-  # Step 1: Install dependencies
+  # Step 0: Install dependencies
   - name: 'python:3.13'
     id: 'Install dependencies'
     entrypoint: 'bash'
@@ -30,7 +9,7 @@ steps:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt -t .; fi
 
-  # Step 2: Loop through each changed handler and deploy
+  # Step 1: Deploy all handlers
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'Deploy handlers'
     entrypoint: 'bash'
@@ -41,38 +20,48 @@ steps:
         _RUNTIME=${_RUNTIME}
         PROJECT_ID=${PROJECT_ID}
 
-        while read _HANDLER_FILE; do
-          [ -z "${_HANDLER_FILE}" ] && continue
+        # Deploy auth_handler
+        echo "[INFO] Deploying auth_handler"
+        echo "from handlers.auth_handler import auth_handler" > main.py
+        gcloud functions deploy auth_handler \
+          --gen2 \
+          --runtime=${_RUNTIME} \
+          --region=${_REGION} \
+          --source=. \
+          --entry-point=auth_handler \
+          --trigger-http \
+          --allow-unauthenticated \
+          --memory=256MB \
+          --timeout=60s
 
-          _HANDLER_MODULE=$(echo "${_HANDLER_FILE}" | sed 's|/|.|g' | sed 's|.py$||')
-          _HANDLER_NAME=$(basename "${_HANDLER_FILE}" .py)
+        # Deploy ride_handler
+        echo "[INFO] Deploying ride_handler"
+        echo "from handlers.ride_handler import ride_handler" > main.py
+        gcloud functions deploy ride_handler \
+          --gen2 \
+          --runtime=${_RUNTIME} \
+          --region=${_REGION} \
+          --source=. \
+          --entry-point=ride_handler \
+          --trigger-http \
+          --allow-unauthenticated \
+          --memory=256MB \
+          --timeout=60s
 
-          echo "[INFO] Preparing ${_HANDLER_NAME} from ${_HANDLER_MODULE}"
-
-          # Create main.py for this handler
-          echo "from ${_HANDLER_MODULE} import ${_HANDLER_NAME}" > main.py
-
-          # Deploy the handler with secrets mounted as env vars
-          gcloud functions deploy ${_HANDLER_NAME} \
-            --gen2 \
-            --runtime=${_RUNTIME} \
-            --region=${_REGION} \
-            --source=. \
-            --entry-point=${_HANDLER_NAME} \
-            --trigger-http \
-            --allow-unauthenticated \
-            --memory=256MB \
-            --timeout=60s \
-            --set-secrets=MY_SECRET=projects/${PROJECT_ID}/secrets/my_secret_name:latest
-
-          # Set IAM policy for public HTTP access
-          _SERVICE_NAME=$(gcloud functions describe ${_HANDLER_NAME} --gen2 --region=${_REGION} --format='value(serviceConfig.service)')
-          gcloud run services add-iam-policy-binding ${_SERVICE_NAME} \
-            --region=${_REGION} \
-            --member=allUsers \
-            --role=roles/run.invoker
-
-        done < /workspace/changed_handlers.txt
+        # Deploy matchmaker_handler
+        echo "[INFO] Deploying matchmaker_handler"
+        echo "from handlers.matchmaker_handler import matchmaker_handler" > main.py
+        gcloud functions deploy matchmaker_handler \
+          --gen2 \
+          --runtime=${_RUNTIME} \
+          --region=${_REGION} \
+          --source=. \
+          --entry-point=matchmaker_handler \
+          --trigger-topic=${_PUBSUB_TOPIC} \
+          --memory=256MB \
+          --timeout=60s \
+          --set-env-vars="PUBSUB_TOPIC_NAME=${_PUBSUB_TOPIC},PUBSUB_SUBSCRIPTION_NAME=${_PUBSUB_SUBSCRIPTION},FIREBASE_RTDB_URL=${_FIREBASE_RTDB_URL},GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
+          --set-secrets="FIREBASE_API_KEY=projects/${PROJECT_ID}/secrets/firebase-api-key:latest,GOOGLE_OAUTH_CLIENT_ID=projects/${PROJECT_ID}/secrets/google-oauth-client-id:latest"
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -80,4 +69,6 @@ options:
 substitutions:
   _REGION: us-central1
   _RUNTIME: python313
-  _CHANGED: ''
+  _PUBSUB_TOPIC: ride-requests
+  _PUBSUB_SUBSCRIPTION: matchmaking-sub
+  _FIREBASE_RTDB_URL: 'https://chauffeur-38757-default-rtdb.firebaseio.com/'
